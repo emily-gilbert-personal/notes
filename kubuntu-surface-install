@@ -1,0 +1,122 @@
+# Kubuntu Surface Kernel Installation Guide
+
+A comprehensive, step-by-step guide to adding the linux-surface repository, enrolling the security certificates, forcing the blue MokManager prompt, and permanently configuring the GRUB boot paths.
+
+## Phase 1: Configure UEFI Security (Hardware Level)
+Before writing any software configuration, you must permit third-party Linux kernels to execute.
+1. Shut down the Surface completely.
+2. Press and hold the **Volume Up** button, then tap the physical **Power** button. 
+3. Keep holding Volume Up until the white UEFI configuration dashboard displays.
+4. Navigate to **Security** -> **Secure Boot** -> **Change Configuration**.
+5. Switch the profile option to **Microsoft & 3rd party CA**. *(Crucial: A setting of "Microsoft Only" will strictly block the Linux boot signature).*
+6. Select **Exit** and click **Restart Now** to boot back into your standard Kubuntu desktop environment.
+
+---
+
+## Phase 2: Add Official Repository Keys & Sources
+Instruct APT where to look for the customized kernel builds and pull down the security signatures.
+
+1. Open a terminal instance (`Ctrl + Alt + T`).
+2. Download and securely append the project's cryptographic GPG validation key:
+   ```bash
+   wget -qO - https://raw.githubusercontent.com/linux-surface/linux-surface/master/pkg/keys/surface.asc | gpg --dearmor | sudo dd of=/etc/apt/trusted.gpg.d/linux-surface.gpg
+   ```
+3. Inject the repository path into your system's package manager sources:
+   ```bash
+   echo "deb [arch=amd64] https://pkg.surfacelinux.com/debian release main" | sudo tee /etc/apt/sources.list.d/linux-surface.list
+   ```
+4. Refresh your package configurations:
+   ```bash
+   sudo apt update
+   ```
+
+---
+
+## Phase 3: Force the GRUB Boot Menu to Standby
+Kubuntu hides the system bootpicker screen by default. Unhiding it ensures you can easily choose different environments during maintenance.
+
+1. Open your master boot file config:
+   ```bash
+   sudo nano /etc/default/grub
+   ```
+2. Modify or add these two lines to force a visible countdown screen:
+   ```text
+   GRUB_TIMEOUT_STYLE=menu
+   GRUB_TIMEOUT=5
+   ```
+3. Save your file edits (`Ctrl + O`, `Enter`) and close the program (`Ctrl + X`).
+4. Rebuild the system configuration layer:
+   ```bash
+   sudo update-grub
+   ```
+
+---
+
+## Phase 4: Install Packages & Set Up MOK Signatures
+Install the customized kernel image alongside the low-level Secure Boot enrollment scripts.
+
+1. Execute the system application install command:
+   ```bash
+   sudo apt install linux-image-surface linux-headers-surface iptsd linux-surface-secureboot-mok
+   ```
+   *(Note: Kubuntu 24.04/26.04+ natively manages device input rules. Omit `libwacom-surface` during package setups to avoid dependency compilation conflicts).*
+
+2. Force-inject the secure boot automated policy sequence:
+   ```bash
+   sudo update-secureboot-policy --new-key
+   sudo update-secureboot-policy --enroll-key
+   ```
+   *When prompted to generate an execution password, input **`surface`** (lowercase, letters will intentionally remain hidden as you type).*
+
+3. Initialize a clean reboot from your command prompt:
+   ```bash
+   sudo reboot
+   ```
+
+---
+
+## Phase 5: Clear the Blue MokManager Screen
+When your computer cycles back into the initial power-up screen, a blue **MokManager** system layout will intercept the normal boot chain.
+1. Select **Enroll MOK** from the available options.
+2. Select **Continue**.
+3. When prompted for the security clearance password, type **`surface`** and hit `Enter`.
+4. Validate the enrollment choices and proceed to click **Reboot**.
+
+---
+
+## Phase 6: Lock the Surface Kernel Path Dynamically
+Kubuntu naturally preferences the standard canonical generic kernel build. Instruct the OS boot engine to route immediately to your new drivers.
+
+1. Back on your desktop screen, reopen the boot loader configuration file:
+   ```bash
+   sudo nano /etc/default/grub
+   ```
+2. Replace your current `GRUB_DEFAULT=0` indicator with the explicit Kubuntu target parameter structure:
+   ```text
+   GRUB_DEFAULT="Advanced options for Kubuntu GNU/Linux>Kubuntu GNU/Linux, with Linux linux-surface"
+   ```
+3. Save the edits and exit out (`Ctrl + O`, `Enter`, `Ctrl + X`).
+4. Execute your final bootloader mapping refresh:
+   ```bash
+   sudo update-grub
+   ```
+5. Reboot your machine:
+   ```bash
+   sudo reboot
+   ```
+
+---
+
+## Phase 7: Post-Install System Verification
+Open your shell application window and evaluate these lines to certify that your hardware configuration layers are running correctly:
+
+* **Validate the active production kernel:**
+  ```bash
+  uname -r
+  ```
+  *(The return text **must** display the specific project extension suffix, e.g., `6.11.x-surface`)*
+
+* **Emergency input daemon reboot (if touchscreen/trackpad click filter hangs mid-session):**
+  ```bash
+  sudo systemctl restart iptsd
+  ```
